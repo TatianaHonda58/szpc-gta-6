@@ -6,7 +6,7 @@
 [![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/pt-BR/docs/Web/JavaScript)
 [![GSAP](https://img.shields.io/badge/GSAP-88CE02?style=for-the-badge&logo=greensock&logoColor=black)](https://greensock.com/gsap/)
 
-Landing page interativa inspirada no lançamento de **Grand Theft Auto VI (GTA VI)**, desenvolvida durante o evento **"Semana do Zero ao Programador Contratado"** promovido pelo **DEV em Dobro**.
+Landing page interativa inspirada no lançamento de **Grand Theft Auto VI (GTA VI)**, desenvolvida durante o evento **"Semana do Zero ao Programador Contratado"** promovido pelo **Dev em Dobro**.
 
 ---
 
@@ -68,4 +68,4 @@ cd szpc-gta-6
 🎓 Agradecimentos
 - Projeto desenvolvido com base nas aulas dos instrutores Ricardo Dias e Beto Dias do canal DEV em Dobro durante o evento Semana do Zero ao Programador Contratado.
 
-# Desenvolvido com 🩷 por Tatiana Mitiko Honda
+# Desenvolvido por Tatiana Mitiko Honda
