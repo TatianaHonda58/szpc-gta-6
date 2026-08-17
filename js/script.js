@@ -17,124 +17,143 @@
 //    - prender a capa na tela enquanto a pessoa rola
 //    - sumir com o conteúdo da capa e revelar o vídeo
 //    - avançar o tempo do vídeo conforme o scroll
+//    - o vídeo NUNCA toca sozinho: quem manda no tempo é a rolagem
+//    - quando o vídeo chega no fim, o pin acaba junto e a página é liberada
 
-
-
-// Passos:
-// 1. MENU QUE SOME AO ROLAR
-//    - achar o menu no HTML
 const menu = document.getElementById("menu");
-
-//    - achar todos os elementos com a classe "aparecer"
 const blocos = document.querySelectorAll(".aparecer");
-
-//    - achar o vídeo da capa
 const video = document.querySelector(".capa-video");
-
 const capa = document.querySelector(".capa");
 const capaPainel = document.querySelector(".capa-painel");
 const capaConteudo = document.querySelector(".capa-conteudo");
 const capaBarra = document.querySelector(".capa-barra");
 const capaSeta = document.querySelector(".capa-seta");
 
-//    - escutar o evento de rolagem da janela
 if (menu) {
-window.addEventListener("scroll", function() {
-
-    //   - se a página desceu mais de 50px, adicionar a classe "menu-rolado"
-    if(window.scrollY > 50) {
-        menu.classList.add("menu-rolado");
-    } else{
-        //    - se voltou pro topo, remover a classe
-        menu.classList.remove("menu-rolado");
-    }    
-});
+    window.addEventListener("scroll", function () {
+        if (window.scrollY > 50) {
+            menu.classList.add("menu-rolado");
+        } else {
+            menu.classList.remove("menu-rolado");
+        }
+    });
 }
 
-
-// 2. BLOCOS QUE APARECEM
-//    - avisar quando cada um entrar na tela
 if (blocos.length) {
-    const observador = new IntersectionObserver(function(entradas) {
-
-        entradas.forEach(function(entrada) {
-            if(entrada.isIntersecting) {
-                //    - ao entrar, adicionar a classe "visivel"
+    const observador = new IntersectionObserver(function (entradas) {
+        entradas.forEach(function (entrada) {
+            if (entrada.isIntersecting) {
                 entrada.target.classList.add("visivel");
             }
         });
     });
 
-    blocos.forEach(function(bloco) {
+    blocos.forEach(function (bloco) {
         observador.observe(bloco);
     });
 }
 
-
-// 3. VÍDEO QUE ANDA COM O SCROLL
 if (window.gsap && window.ScrollTrigger && video && capa && capaPainel && capaConteudo) {
     gsap.registerPlugin(ScrollTrigger);
 
+    const DISTANCIA_PIN = 2500;
+    // margem pra parar no último frame sem disparar o "ended" (que rebobina em alguns navegadores)
+    const MARGEM_FINAL = 0.05;
+
     video.muted = true;
     video.playsInline = true;
-    video.setAttribute("playsInline", "true");
+    video.setAttribute("playsinline", "true");
+    video.removeAttribute("autoplay");
+    video.removeAttribute("loop");
+    video.loop = false;
+    video.pause();
 
-    const tocarVideo = function () {
-        const playPromise = video.play();
+    let duracao = 0;
+    let liberado = false;
 
-        if (playPromise && typeof playPromise.catch == "function") {
-            playPromise.catch(function () {
-            // autoplay pode ser bloqueado até o usuário interagir    
-            });
+    // trava de segurança: se algo mandar o vídeo tocar, ele volta a ficar parado
+    video.addEventListener("play", function () {
+        if (!liberado) {
+            video.pause();
+        }
+    });
+
+    const guardarDuracao = function () {
+        if (video.duration && Number.isFinite(video.duration)) {
+            duracao = video.duration;
+            ScrollTrigger.refresh();
         }
     };
 
-
-    if (video.readyState >= 2) {
-        tocarVideo();
-    } else{
-        video.addEventListener("loadeddata", tocarVideo, { once: true });    
+    if (video.readyState >= 1) {
+        guardarDuracao();
+    } else {
+        video.addEventListener("loadedmetadata", guardarDuracao, { once: true });
     }
 
-//    - prender a capa na tela enquanto a pessoa rola
+    // alguns navegadores só liberam o seek depois de um play; damos play e pausamos na hora
+    const prepararVideo = function () {
+        liberado = true;
 
-gsap.timeline({
-    scrollTrigger: {
-      trigger: ".capa",
-      start: "top top",
-      end: "+=2500",
-      scrub: 1,
-      pin: true // travar a capa
-    }
-  })
+        const playPromise = video.play();
 
-  //    - sumir com o conteúdo da capa e revelar o vídeo
-  .to(video, { opacity: 1, ease: "none" }, 0)
-  .to(".capa-conteudo, .capa-barra, .capa-seta", {
-    opacity: 0,
-    y: -40,
-    scale: 0.6,
-    duration: 0.1,
-    ease:"none",
-  }, 0.02);
+        const parar = function () {
+            liberado = false;
+            video.pause();
+            // volta pro frame que o scroll está pedindo agora
+            aplicarTempo();
+        };
 
-  //    - avançar o tempo do vídeo conforme o scroll
-   gsap.to(video, {
-        currentTime: function () {
-            if (!video.duration || Number.isNaN(video.duration)) {
-                return 0;
-            }
+        if (playPromise && typeof playPromise.then === "function") {
+            playPromise.then(parar).catch(function () {
+                liberado = false;
+            });
+        } else {
+            parar();
+        }
+    };
 
-            return video.duration;
-        },
-        ease: "none",
+    window.addEventListener("pointerdown", prepararVideo, { once: true });
+    window.addEventListener("touchstart", prepararVideo, { once: true });
+
+    // objeto intermediário: o GSAP anima esse tempo com o scrub e a gente repassa pro vídeo
+    const estado = { tempo: 0 };
+
+    const aplicarTempo = function () {
+        if (!duracao || video.readyState < 1) {
+            return;
+        }
+
+        if (Math.abs(video.currentTime - estado.tempo) > 0.01) {
+            video.currentTime = estado.tempo;
+        }
+    };
+
+    gsap.timeline({
         scrollTrigger: {
             trigger: capa,
             start: "top top",
-            end: "+=1200",
-            scrub: 1.2,
+            end: "+=" + DISTANCIA_PIN,
+            scrub: 1,
+            pin: true,
             invalidateOnRefresh: true,
         }
-    });
+    })
+        .to(video, { opacity: 1, duration: 0.15, ease: "none" }, 0)
+        .to(".capa-conteudo, .capa-barra, .capa-seta", {
+            opacity: 0,
+            y: -40,
+            scale: 0.6,
+            duration: 0.1,
+            ease: "none",
+        }, 0.02)
+        // duração 1 = o vídeo ocupa o pin inteiro e termina exatamente quando o scroll é liberado
+        .fromTo(estado, { tempo: 0 }, {
+            tempo: function () {
+                return Math.max(duracao - MARGEM_FINAL, 0);
+            },
+            duration: 1,
+            ease: "none",
+            onUpdate: aplicarTempo,
+        }, 0);
 }
-
